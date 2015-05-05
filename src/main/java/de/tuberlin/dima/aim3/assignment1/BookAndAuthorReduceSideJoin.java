@@ -36,6 +36,7 @@ public class BookAndAuthorReduceSideJoin extends HadoopJob {
 
     // IMPLEMENT ME
 
+    // TEST
     return 0;
   }
 }
