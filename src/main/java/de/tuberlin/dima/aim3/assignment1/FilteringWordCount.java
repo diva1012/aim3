@@ -51,6 +51,8 @@ public class FilteringWordCount extends HadoopJob {
     @Override
     protected void map(Object key, Text line, Context ctx) throws IOException, InterruptedException {
       // IMPLEMENT ME
+
+      // Test
     }
   }
 
