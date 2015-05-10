@@ -19,11 +19,17 @@
 package de.tuberlin.dima.aim3.assignment1;
 
 import de.tuberlin.dima.aim3.HadoopJob;
+import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.types.DoubleValue;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -41,25 +47,54 @@ public class AverageTemperaturePerMonth extends HadoopJob {
 
     double minimumQuality = Double.parseDouble(parsedArgs.get("--minimumQuality"));
 
-    //IMPLEMENT ME
+    // TODO maybe I just have to use the flink functions
+
+
+    Job averageTemp = prepareJob(inputPath, outputPath, TextInputFormat.class, MyMapper.class,
+            Text.class, DoubleWritable.class, MyReducer.class, Text.class, DoubleWritable.class, TextOutputFormat.class);
+
+    averageTemp.waitForCompletion(true);
 
     return 0;
   }
 
-  static class FilteringWordCountMapper extends Mapper<Object,Text,Text,IntWritable> {
+  static class MyMapper extends Mapper<Object,Text,Text,DoubleWritable> {
     @Override
     protected void map(Object key, Text line, Context ctx) throws IOException, InterruptedException {
 
+      String lineAsString = line.toString();
+      String[] infos = lineAsString.split("\\s+");
 
+      Integer year = Integer.parseInt(infos[0]);
+      Integer month = Integer.parseInt(infos[1]);
+      double temp = Double.parseDouble(infos[2]);
+      double quality = Double.parseDouble(infos[3]);
+
+      DoubleWritable tempAsWritable = new DoubleWritable(temp);
+
+      if (quality >= 0.25) {
+        String yearmonth = year.toString() + "\t" + month.toString();
+        ctx.write(new Text(yearmonth), tempAsWritable);
+      }
     }
   }
 
-  static class WordCountReducer extends Reducer<Text,IntWritable,Text,IntWritable> {
+  static class MyReducer extends Reducer<Text,DoubleWritable,Text,DoubleWritable> {
     @Override
-    protected void reduce(Text key, Iterable<IntWritable> values, Context ctx)
+    protected void reduce(Text key, Iterable<DoubleWritable> values, Context ctx)
             throws IOException, InterruptedException {
 
+      Double summ = 0.0;
+      Integer count = 0;
 
+      for (DoubleWritable value : values){
+
+        summ = summ + value.get();
+        count ++;
+      }
+
+      Double avg = summ / count;
+      ctx.write(key, new DoubleWritable(avg));
     }
   }
 }

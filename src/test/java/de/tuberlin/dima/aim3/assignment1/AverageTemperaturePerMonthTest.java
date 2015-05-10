@@ -56,6 +56,11 @@ public class AverageTemperaturePerMonthTest extends HadoopTestCase {
 
     Map<YearAndMonth, Double> results = readResults(new File(outputDir, "part-r-00000"));
 
+    for (Map.Entry<YearAndMonth, Double> entry : results.entrySet())
+    {
+      System.out.println(entry.getKey() + "/" + entry.getValue());
+    }
+
     assertEquals(results.get(new YearAndMonth(1990, 8)), 8, EPSILON);
     assertEquals(results.get(new YearAndMonth(1992, 4)), 7.888d, EPSILON);
     assertEquals(results.get(new YearAndMonth(1994, 1)), 8.24, EPSILON);

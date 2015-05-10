@@ -56,7 +56,7 @@ public class PrimeNumbersWritable implements Writable {
 
     // Insert all elements to the newly created array
     for(int i=0; i<numbers.length; i++){
-      this.numbers[i] = in.readInt();
+      numbers[i] = in.readInt();
     }
   }
 
