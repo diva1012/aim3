@@ -28,7 +28,12 @@ import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 
+
 import java.io.IOException;
+import java.lang.reflect.Array;
+import java.util.Arrays;
+import java.util.List;
+import java.lang.String;
 import java.util.Map;
 
 public class FilteringWordCount extends HadoopJob {
@@ -50,9 +55,25 @@ public class FilteringWordCount extends HadoopJob {
   static class FilteringWordCountMapper extends Mapper<Object,Text,Text,IntWritable> {
     @Override
     protected void map(Object key, Text line, Context ctx) throws IOException, InterruptedException {
-      // IMPLEMENT ME
 
-      // Test
+      IntWritable intOne = new IntWritable(1);
+      List<String> forbidenWords = Arrays.asList("the", "in", "to", "and");
+
+      String lineAsString = line.toString();
+      String lineToLowerCase = lineAsString.toLowerCase();
+      String[] words =  lineToLowerCase.split(" ");
+
+
+      for (String word : words){
+
+        // This could be impemented in reducer
+        if (!forbidenWords.contains(word)){
+          word = word.replace(",", "" );
+          Text singleWord = new Text(word);
+          ctx.write(singleWord, intOne);
+          System.out.println(singleWord.toString());
+        }
+      }
     }
   }
 
@@ -60,7 +81,15 @@ public class FilteringWordCount extends HadoopJob {
     @Override
     protected void reduce(Text key, Iterable<IntWritable> values, Context ctx)
         throws IOException, InterruptedException {
-      // IMPLEMENT ME
+
+      int count = 0;
+
+      for (IntWritable value : values){
+        count += value.get();
+      }
+
+      ctx.write(key, new IntWritable(count));
+      System.out.println(key.toString() +  " " + count);
     }
   }
 

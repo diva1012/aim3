@@ -39,12 +39,25 @@ public class PrimeNumbersWritable implements Writable {
 
   @Override
   public void write(DataOutput out) throws IOException {
-    //IMPLEMENT ME
+
+    out.writeInt(numbers.length);
+    for (int value : numbers){
+      out.writeInt(value);
+    }
   }
 
   @Override
   public void readFields(DataInput in) throws IOException {
-    //IMPLEMENT ME
+
+    // Get the size of the array
+    int arrayLength = in.readInt();
+    // Create new array with the same proper size
+    numbers = new int[arrayLength];
+
+    // Insert all elements to the newly created array
+    for(int i=0; i<numbers.length; i++){
+      this.numbers[i] = in.readInt();
+    }
   }
 
   @Override

@@ -20,7 +20,14 @@ package de.tuberlin.dima.aim3.assignment1;
 
 import de.tuberlin.dima.aim3.HadoopJob;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
 
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 
 public class AverageTemperaturePerMonth extends HadoopJob {
@@ -37,5 +44,22 @@ public class AverageTemperaturePerMonth extends HadoopJob {
     //IMPLEMENT ME
 
     return 0;
+  }
+
+  static class FilteringWordCountMapper extends Mapper<Object,Text,Text,IntWritable> {
+    @Override
+    protected void map(Object key, Text line, Context ctx) throws IOException, InterruptedException {
+
+
+    }
+  }
+
+  static class WordCountReducer extends Reducer<Text,IntWritable,Text,IntWritable> {
+    @Override
+    protected void reduce(Text key, Iterable<IntWritable> values, Context ctx)
+            throws IOException, InterruptedException {
+
+
+    }
   }
 }
