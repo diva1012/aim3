@@ -70,7 +70,7 @@ public class AverageTemperaturePerMonth extends HadoopJob {
             double quality = Double.parseDouble(infos[3]);
 
             DoubleWritable tempAsWritable = new DoubleWritable(temp);
-            
+
             double minQuality = Double.parseDouble(ctx.getConfiguration().get("minQuality"));
 
             if (quality >= minQuality) {
