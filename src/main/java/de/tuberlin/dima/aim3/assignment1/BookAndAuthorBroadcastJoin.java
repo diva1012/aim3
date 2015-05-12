@@ -26,6 +26,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
@@ -51,8 +52,7 @@ public class BookAndAuthorBroadcastJoin extends HadoopJob {
     Path outputPath = new Path(parsedArgs.get("--output"));
 
 
-    Job booksAndAuthors = prepareJob(authors, outputPath, TextInputFormat.class, MyMapper.class,
-            Text.class, DoubleWritable.class, MyReducer.class, Text.class, DoubleWritable.class, TextOutputFormat.class);
+    Job booksAndAuthors = prepareJob(books, outputPath, TextInputFormat.class, BroadCastMap.class, Text.class, NullWritable.class, TextOutputFormat.class);
 
 
     // Read the data of the file
@@ -75,15 +75,22 @@ public class BookAndAuthorBroadcastJoin extends HadoopJob {
 
     booksAndAuthors.waitForCompletion(true);
 
-
     return 0;
   }
 
   // Broadcast join is a map-only algorithm
-  static class MyMapper extends Mapper<Object, Text, Text, DoubleWritable> {
+  static class BroadCastMap extends Mapper<Object, Text, Text, NullWritable> {
     @Override
     protected void map(Object key, Text line, Context ctx) throws IOException, InterruptedException {
 
+
+      // Parse the line
+      String lineAsString = line.toString();
+      String[] bookInfos = lineAsString.split("\t");
+
+      String bookAuthor = (bookInfos[0]);
+      String bookYear = (bookInfos[1]);
+      String bookTitle = (bookInfos[2]);
 
       // We have to read the authors
       String authors = ctx.getConfiguration().get("authors");
@@ -91,38 +98,23 @@ public class BookAndAuthorBroadcastJoin extends HadoopJob {
 
       for (int i=0; i<authorsLines.length; i++){
 
-
-
-        System.out.println(authorsLines[i]);
-        System.out.println();
-
         String[] idToAuthorPair = authorsLines[i].split("\t");
-        System.out.println("\t" + idToAuthorPair[0]);
-        System.out.println("\t" + idToAuthorPair[1]);
+
+        String authorId = idToAuthorPair[0];
+        String authorName = idToAuthorPair[1];
+
+        if (bookAuthor.equals(authorId)){
+
+
+          String bookInformation = authorName + "\t" + bookTitle + "\t" + bookYear;
+          System.out.println(bookInformation);
+
+          ctx.write(new Text(bookInformation), NullWritable.get());
+        }
+
 
       }
 
-
-
-      String lineAsString = line.toString();
-      //String[] infos = lineAsStrig
-
-
-      ctx.write(new Text("test"), new DoubleWritable(45.3));
-
     }
   }
-
-  static class MyReducer extends Reducer<Text,IntWritable,Text,IntWritable> {
-    @Override
-    protected void reduce(Text key, Iterable<IntWritable> values, Context ctx)
-            throws IOException, InterruptedException {
-
-
-
-    }
-  }
-
-
-
 }
