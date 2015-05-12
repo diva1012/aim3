@@ -47,37 +47,38 @@ public class AverageTemperaturePerMonth extends HadoopJob {
 
     double minimumQuality = Double.parseDouble(parsedArgs.get("--minimumQuality"));
 
-    // TODO maybe I just have to use the flink functions
-
-
     Job averageTemp = prepareJob(inputPath, outputPath, TextInputFormat.class, MyMapper.class,
             Text.class, DoubleWritable.class, MyReducer.class, Text.class, DoubleWritable.class, TextOutputFormat.class);
+
+     averageTemp.getConfiguration().set("minQuality", String.valueOf(minimumQuality));
 
     averageTemp.waitForCompletion(true);
 
     return 0;
   }
 
-  static class MyMapper extends Mapper<Object,Text,Text,DoubleWritable> {
-    @Override
-    protected void map(Object key, Text line, Context ctx) throws IOException, InterruptedException {
+    static class MyMapper extends Mapper<Object,Text,Text,DoubleWritable> {
+        @Override
+        protected void map(Object key, Text line, Context ctx) throws IOException, InterruptedException {
+            String lineAsString = line.toString();
+            String[] infos = lineAsString.split("\\s+");
 
-      String lineAsString = line.toString();
-      String[] infos = lineAsString.split("\\s+");
+            Integer year = Integer.parseInt(infos[0]);
+            Integer month = Integer.parseInt(infos[1]);
 
-      Integer year = Integer.parseInt(infos[0]);
-      Integer month = Integer.parseInt(infos[1]);
-      double temp = Double.parseDouble(infos[2]);
-      double quality = Double.parseDouble(infos[3]);
+            double temp = Double.parseDouble(infos[2]);
+            double quality = Double.parseDouble(infos[3]);
 
-      DoubleWritable tempAsWritable = new DoubleWritable(temp);
+            DoubleWritable tempAsWritable = new DoubleWritable(temp);
+            
+            double minQuality = Double.parseDouble(ctx.getConfiguration().get("minQuality"));
 
-      if (quality >= 0.25) {
-        String yearmonth = year.toString() + "\t" + month.toString();
-        ctx.write(new Text(yearmonth), tempAsWritable);
-      }
+            if (quality >= minQuality) {
+                String yearmonth = year.toString() + "\t" + month.toString();
+                ctx.write(new Text(yearmonth), tempAsWritable);
+            }
+        }
     }
-  }
 
   static class MyReducer extends Reducer<Text,DoubleWritable,Text,DoubleWritable> {
     @Override
