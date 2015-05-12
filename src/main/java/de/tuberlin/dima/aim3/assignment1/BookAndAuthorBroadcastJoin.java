@@ -18,6 +18,7 @@
 
 package de.tuberlin.dima.aim3.assignment1;
 
+import com.google.common.base.Charsets;
 import de.tuberlin.dima.aim3.HadoopJob;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -50,7 +51,7 @@ public class BookAndAuthorBroadcastJoin extends HadoopJob {
     Path outputPath = new Path(parsedArgs.get("--output"));
 
 
-    Job averageTemp = prepareJob(authors, outputPath, TextInputFormat.class, MyMapper.class,
+    Job booksAndAuthors = prepareJob(authors, outputPath, TextInputFormat.class, MyMapper.class,
             Text.class, DoubleWritable.class, MyReducer.class, Text.class, DoubleWritable.class, TextOutputFormat.class);
 
 
@@ -63,14 +64,16 @@ public class BookAndAuthorBroadcastJoin extends HadoopJob {
     FSDataInputStream inputStream = fs.open(authors);
 
     StringWriter writer = new StringWriter();
-    IOUtils.copy(inputStream, writer, "UTF-8");
+    IOUtils.copy(inputStream, writer, Charsets.UTF_8);
     String authorsAsString = writer.toString();
 
     System.out.println(authorsAsString);
 
 
-    Configuration configuration = averageTemp.getConfiguration();
+    Configuration configuration = booksAndAuthors.getConfiguration();
     configuration.set("authors", authorsAsString);
+
+    booksAndAuthors.waitForCompletion(true);
 
 
     return 0;
@@ -82,16 +85,30 @@ public class BookAndAuthorBroadcastJoin extends HadoopJob {
     protected void map(Object key, Text line, Context ctx) throws IOException, InterruptedException {
 
 
-      // We have to read the broadcasted file
+      // We have to read the authors
+      String authors = ctx.getConfiguration().get("authors");
+      String[] authorsLines = authors.split("\n");
 
-      String authors = ctx.getConfiguration().get("quality");
-      //List<String> authorsLines =
+      for (int i=0; i<authorsLines.length; i++){
 
-      authors.split("\n");
+
+
+        System.out.println(authorsLines[i]);
+        System.out.println();
+
+        String[] idToAuthorPair = authorsLines[i].split("\t");
+        System.out.println("\t" + idToAuthorPair[0]);
+        System.out.println("\t" + idToAuthorPair[1]);
+
+      }
+
 
 
       String lineAsString = line.toString();
       //String[] infos = lineAsStrig
+
+
+      ctx.write(new Text("test"), new DoubleWritable(45.3));
 
     }
   }
@@ -101,14 +118,8 @@ public class BookAndAuthorBroadcastJoin extends HadoopJob {
     protected void reduce(Text key, Iterable<IntWritable> values, Context ctx)
             throws IOException, InterruptedException {
 
-      int count = 0;
 
-      for (IntWritable value : values){
-        count += value.get();
-      }
 
-      ctx.write(key, new IntWritable(count));
-      System.out.println(key.toString() +  " " + count);
     }
   }
 
