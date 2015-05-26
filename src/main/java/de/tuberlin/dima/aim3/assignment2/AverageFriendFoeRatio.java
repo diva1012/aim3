@@ -19,13 +19,13 @@
 package de.tuberlin.dima.aim3.assignment2;
 
 import com.google.common.collect.Iterables;
-import org.apache.flink.api.common.functions.FilterFunction;
-import org.apache.flink.api.common.functions.FlatMapFunction;
-import org.apache.flink.api.common.functions.GroupReduceFunction;
-import org.apache.flink.api.common.functions.RichGroupReduceFunction;
+import org.apache.commons.math.stat.descriptive.summary.Sum;
+import org.apache.flink.api.common.functions.*;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
+import org.apache.flink.api.java.aggregation.Aggregations;
 import org.apache.flink.api.java.operators.DataSource;
+import org.apache.flink.api.java.tuple.Tuple;
 import org.apache.flink.api.java.tuple.Tuple1;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
@@ -56,43 +56,72 @@ public class AverageFriendFoeRatio {
             .distinct().reduceGroup(new CountVertices());
 
     /* Compute the degree of every vertex */
-    // We get all src vertices and group them by id then we count them ------> Count src vertices pro id
+    // We get all src vertices and group them by id then we count them ------> Count src vertices pro i d
     DataSet<Tuple3<Long, Long, Long>> verticesWithDegree =
         edges.project(0,2).types(Long.class, Boolean.class)
-             .groupBy(0).reduceGroup(new DegreeOfPositiveVertex());
+             .groupBy(0).reduceGroup(new PositiveAndNegativeDegreeVertex());
 
 
-    /* Compute the degree distribution */
-    // We goup by count of indeces and then (we pass count of vertices as parameter)
-    DataSet<Tuple2<Long, Double>> degreeDistribution =
-        verticesWithDegree.groupBy(1).reduceGroup(new DistributionElementPositive())
-                                     .withBroadcastSet(numVertices, "numVertices");
+    DataSet<Tuple1<Long>> countNotNullVertices = verticesWithDegree.map(new MapForComputingCount()).aggregate(Aggregations.SUM, 0);
+    //DataSet<Long> countNotNullVertices = verticesWithDegree.map(new MapForComputingCount()).reduceGroup(new CountVertices());
 
 
-    DataSet<Tuple2<Long, Double>> degreeDistribution2 =
-            verticesWithDegree.groupBy(2).reduceGroup(new DistributionElementNegative())
-                    .withBroadcastSet(numVertices, "numVertices");
+    DataSet<Tuple1<Double>> friendFoesRatios = verticesWithDegree.map(new FriendsFoesRatioMap());
+    DataSet<Tuple1<Double>> ratioSumm = friendFoesRatios.aggregate(Aggregations.SUM, 0);
 
+    // TODO Devide ratioSumm / countNotNullVertices (I don't know how to do that, even if it is really really simple)
 
-    DataSet<Tuple3<Long, Double, Double>> posAndNegDistr = degreeDistribution.join(degreeDistribution2).where(0).equalTo(0).projectFirst(0,1).projectSecond(1).types(Long.class,Double.class,Double.class);
-
-
-    posAndNegDistr.writeAsText(Config.outputPath(), FileSystem.WriteMode.OVERWRITE);
-    posAndNegDistr.filter(new MyFilter());
-
-    
+    ratioSumm.writeAsText(Config.outputPath(), FileSystem.WriteMode.OVERWRITE);
+    countNotNullVertices.writeAsText(Config.outputPath(), FileSystem.WriteMode.OVERWRITE);
 
     env.execute();
   }
 
+  private static class FinalRatioMaper extends RichGroupReduceFunction<Tuple1<Double>, Tuple1<Double>> {
 
-  public static final class MyFilter implements FilterFunction<Tuple3<Long, Double, Double>> {
 
-    @Override
-    public boolean filter(Tuple3<Long, Double, Double> value) {
-      return true;
+     private Long countNotNullVertices;
+
+     @Override
+      public void open(Configuration parameters) throws Exception {
+      super.open(parameters);
+       countNotNullVertices = getRuntimeContext().<Long>getBroadcastVariable("countNotNullVertices").get(0);
+              }
+
+      @Override
+      public void reduce(Iterable<Tuple1<Double>> values, Collector<Tuple1<Double>> out) throws Exception {
+        final Iterator<Tuple1<Double>> iterator = values.iterator();
+        double sum = 0;
+        while (iterator.hasNext()) {
+          sum += iterator.next().f0;
+        }
+        out.collect(new Tuple1<Double>(sum / countNotNullVertices));
     }
   }
+
+  public static class FriendsFoesRatioMap implements MapFunction<Tuple3<Long, Long, Long>, Tuple1<Double>> {
+    @Override
+    public Tuple1<Double> map(Tuple3<Long, Long, Long> in) {
+      return new Tuple1<Double>( in.f1.doubleValue() / in.f2.doubleValue()  );
+    }
+  }
+
+  public static class MapForComputingCount implements MapFunction<Tuple3<Long, Long, Long>, Tuple1<Long>> {
+    @Override
+    public Tuple1<Long> map(Tuple3<Long, Long, Long> in) {
+      return new Tuple1<Long>(1L);
+    }
+  }
+
+  // ReduceFunction that sums Integers
+  public class Summer implements ReduceFunction<Integer> {
+    @Override
+    public Integer reduce(Integer num1, Integer num2) {
+      return num1 + num2;
+    }
+  }
+
+
 
   public static class EdgeReader implements FlatMapFunction<String, Tuple3<Long, Long, Boolean>> {
 
@@ -112,6 +141,9 @@ public class AverageFriendFoeRatio {
     }
   }
 
+
+
+
   public static class CountVertices implements GroupReduceFunction<Tuple1<Long>, Long> {
     @Override
     public void reduce(Iterable<Tuple1<Long>> vertices, Collector<Long> collector) throws Exception {
@@ -119,8 +151,7 @@ public class AverageFriendFoeRatio {
     }
   }
 
-
-  public static class DegreeOfPositiveVertex implements GroupReduceFunction<Tuple2<Long, Boolean>, Tuple3<Long, Long, Long>> {
+  public static class PositiveAndNegativeDegreeVertex implements GroupReduceFunction<Tuple2<Long, Boolean>, Tuple3<Long, Long, Long>> {
     @Override
     public void reduce(Iterable<Tuple2<Long, Boolean>> tuples, Collector<Tuple3<Long, Long, Long>> collector) throws Exception {
 
@@ -148,61 +179,9 @@ public class AverageFriendFoeRatio {
         }
       }
 
-      collector.collect(new Tuple3<Long, Long, Long>(vertexId, countPositive, countNegative));
-    }
-  }
-
-  public static class DistributionElementPositive extends RichGroupReduceFunction<Tuple3<Long, Long, Long>, Tuple2<Long, Double>> {
-
-    private long numVertices;
-    // private long isPositive;
-
-    @Override
-    public void open(Configuration parameters) throws Exception {
-      super.open(parameters);
-      numVertices = getRuntimeContext().<Long>getBroadcastVariable("numVertices").get(0);
-      // isPositive = getRuntimeContext().<Long>getBroadcastVariable("isPositive").get(0);
-    }
-
-    @Override
-    public void reduce(Iterable<Tuple3<Long, Long, Long>> verticesWithDegree, Collector<Tuple2<Long, Double>> collector) throws Exception {
-
-      Iterator<Tuple3<Long, Long, Long>> iterator = verticesWithDegree.iterator();
-      Long degree = iterator.next().f1;
-
-      long count = 1L;
-      while (iterator.hasNext()) {
-        iterator.next();
-        count++;
+      if (countNegative != 0 && countPositive != 0) {
+        collector.collect(new Tuple3<Long, Long, Long>(vertexId, countPositive, countNegative));
       }
-
-      collector.collect(new Tuple2<Long, Double>(degree, (double) count / numVertices));
-    }
-  }
-
-  public static class DistributionElementNegative extends RichGroupReduceFunction<Tuple3<Long, Long, Long>, Tuple2<Long, Double>> {
-
-    private long numVertices;
-
-    @Override
-    public void open(Configuration parameters) throws Exception {
-      super.open(parameters);
-      numVertices = getRuntimeContext().<Long>getBroadcastVariable("numVertices").get(0);
-    }
-
-    @Override
-    public void reduce(Iterable<Tuple3<Long, Long, Long>> verticesWithDegree, Collector<Tuple2<Long, Double>> collector) throws Exception {
-
-      Iterator<Tuple3<Long, Long, Long>> iterator = verticesWithDegree.iterator();
-      Long degree = iterator.next().f2;
-
-      long count = 1L;
-      while (iterator.hasNext()) {
-        iterator.next();
-        count++;
-      }
-
-      collector.collect(new Tuple2<Long, Double>(degree, (double) count / numVertices));
     }
   }
 
