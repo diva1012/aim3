@@ -30,7 +30,7 @@ import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.fs.FileSystem;
 
-import java.util.Map;
+import java.util.*;
 
 public class Classification {
 
@@ -83,23 +83,84 @@ public class Classification {
      public void open(Configuration parameters) throws Exception {
        super.open(parameters);
 
-       // IMPLEMENT ME
+         // Get the sums
+
+         List<Tuple2<String, Long>> sums = getRuntimeContext().getBroadcastVariable("sums");
+
+         for (Tuple2<String, Long> sum : sums) {
+             wordSums.put(sum.f0, sum.f1);
+         }
+
+         // get the word counts
+         List<Tuple3<String, String, Long>> conditionals = getRuntimeContext().getBroadcastVariable("conditionals");
+
+         for (Tuple3<String, String, Long> conditional : conditionals ) {
+
+             if (!wordCounts.containsKey(conditional.f0)) {
+                 wordCounts.put(conditional.f0, new HashMap<String, Long>());
+             }
+             wordCounts.get(conditional.f0).put(conditional.f1, conditional.f2);
+         }
+
      }
 
      @Override
      public Tuple3<String, String, Double> map(String line) throws Exception {
 
-       String[] tokens = line.split("\t");
-       String label = tokens[0];
-       String[] terms = tokens[1].split(",");
+         String[] tokens = line.split("\t");
+         String label = tokens[0];
+         String[] terms = tokens[1].split(",");
 
-       double maxProbability = Double.NEGATIVE_INFINITY;
-       String predictionLabel = "";
+         Set<String> termsSet = new HashSet<String>(Arrays.asList(terms));
 
-       // IMPLEMENT ME
+         double maxProbability = Double.NEGATIVE_INFINITY;
+
+         String predictionLabel = "";
+
+         // We have all the needed information. Now we have to implement the classifier
+
+         // Iterate through all labels
+         for (Map.Entry<String, Long> entry : wordSums.entrySet()) {
+
+             Long smoothing = 1L;
+
+             String currentLabel = entry.getKey();
+             Long wordSumForLabel = entry.getValue();
+
+             // The first part of the probability formula is log(P(Y))       Y is a label
+             Double probability = Math.log( wordSumForLabel );
+
+             // get the word counts for current label
+             Map<String, Long> currentTermsForLabel = wordCounts.get(currentLabel);
+
+
+             // The second part of th probability formula is Sum ( log( P ( fi | y ) ) )    fi is a word i for label
+             // Iterate through the words in the line
+             for (String term : terms) {
+
+                 Long termCountForLabel = currentTermsForLabel.get(term);
+
+                 if (termCountForLabel != null) {
+                     probability = probability + Math.log( termCountForLabel +  smoothing);
+                 } else {
+                     probability = probability + Math.log( smoothing );
+                 }
+             }
+
+             // take care of the smoothing parameter
+             double denominator = wordSums.get(currentLabel) + (smoothing * termsSet.size());
+             // calculate the final probability
+             probability = probability - terms.length * Math.log(denominator);
+
+             if ( probability > maxProbability) {
+                 maxProbability = probability;
+                 predictionLabel = currentLabel;
+             }
+
+         }
 
        return new Tuple3<String, String, Double>(label, predictionLabel, maxProbability);
      }
-   }
 
+   }
 }
