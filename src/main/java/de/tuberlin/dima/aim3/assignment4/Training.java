@@ -40,12 +40,16 @@ public class Training {
     DataSet<Tuple3<String, String, Long>> labeledTerms = input.flatMap(new DataReader());
 
     // conditional counter per word per label
-    DataSet<Tuple3<String, String, Long>> termCounts = null; // IMPLEMENT ME
+    //DataSet<Tuple3<String, String, Long>> termCounts = null; // IMPLEMENT ME
+    DataSet<Tuple3<String, String, Long>> termCounts = labeledTerms.groupBy(0,1).sum(2);
+
 
     termCounts.writeAsCsv(Config.pathToConditionals(), "\n", "\t", FileSystem.WriteMode.OVERWRITE);
 
     // word counts per label
-    DataSet<Tuple2<String, Long>> termLabelCounts = null; // IMPLEMENT ME
+    //DataSet<Tuple2<String, Long>> termLabelCounts = null; // IMPLEMENT ME
+
+    DataSet<Tuple2<String, Long>> termLabelCounts = termCounts.groupBy(0).sum(2).project(0,2).types(String.class, Long.class);
 
     termLabelCounts.writeAsCsv(Config.pathToSums(), "\n", "\t", FileSystem.WriteMode.OVERWRITE);
 
