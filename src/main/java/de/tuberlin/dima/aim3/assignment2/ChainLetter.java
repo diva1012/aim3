@@ -47,28 +47,28 @@ public class ChainLetter {
 
     DataSet<Tuple1<Long>> uniqueVertexIds = edgesToVertices.distinct();
 
-    DataSet<Tuple2<Long, Boolean>> selectedInitiators = uniqueVertexIds.map(new SelectInitiators());
+    DataSet<Tuple2<Long, Boolean>> selectedInitiators = uniqueVertexIds.map(new SelectInitiators());  // Zufällig nimm 0.00125 der Vertices
 
     DataSet<Tuple2<Long, Long>> initialForwards =
         selectedInitiators.join(edges).where(0).equalTo(0)
-                          .flatMap(new InitialForwards());
+                          .flatMap(new InitialForwards()); // Nimm alle Daten für die Initiators  (Initial Forwards)
 
     DeltaIteration<Tuple2<Long, Boolean>, Tuple2<Long, Long>> deltaIteration =
-        selectedInitiators.iterateDelta(initialForwards, 3, 0);
+        selectedInitiators.iterateDelta(initialForwards, 3, 0); // Itterieren auf initialForwards (bis 3 mal bei Errors) Lies erste Spalte
 
     DataSet<Tuple1<Long>> deliverMessage =
-        deltaIteration.getWorkset().project(1).types(Long.class).distinct();
+        deltaIteration.getWorkset().project(1).types(Long.class).distinct(); // getWorkset -> Daten na erster Itteration. 1 Spalte daraus nehmen (Empfänger)
 
-    DataSet<Tuple2<Long, Boolean>> nextRecipientStates =
+    DataSet<Tuple2<Long, Boolean>> nextRecipientStates = // getSolutionSet --> Nachdem Itteration fertig ist
         deltaIteration.getSolutionSet()
                           .join(deliverMessage).where(0).equalTo(0)
                           .flatMap(new ReceiveMessage());
 
-    DataSet<Tuple2<Long, Long>> nextForwards =
+    DataSet<Tuple2<Long, Long>> nextForwards =        /// Nimm alle edges die processiert wurden
         nextRecipientStates.join(edges).where(0).equalTo(0)
                            .flatMap(new ForwardToFriend());
 
-    DataSet<Tuple2<Long, Boolean>> result =
+    DataSet<Tuple2<Long, Boolean>> result =             // RUf die nächste itteration auf
         deltaIteration.closeWith(nextRecipientStates, nextForwards);
 
     result.print();
