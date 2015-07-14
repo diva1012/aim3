@@ -21,16 +21,18 @@ public class matrixCalc {
         // Input should be in this form:
         // rowId, colId, value
 
-        String m1PathCSV = "/home/vassil/Documents/Studium/Master/AIM3/aim3/src/main/java/de/tuberlin/dima/aim3/assigntment4bonus/matrix1.csv";
-        String m2PathCSV = "/home/vassil/Documents/Studium/Master/AIM3/aim3/src/main/java/de/tuberlin/dima/aim3/assigntment4bonus/matrix2.csv";
+        String m1PathCSV = "/home/vassil/workspace/aim3/src/main/java/de/tuberlin/dima/aim3/assigntment4bonus/matrix1.csv";
+        String m2PathCSV = "/home/vassil/workspace/aim3/src/main/java/de/tuberlin/dima/aim3/assigntment4bonus/matrix2.csv";
 
-        String path =  "/home/vassil/Documents/Studium/Master/AIM3/aim3/src/main/java/de/tuberlin/dima/aim3/assigntment4bonus/output/";
+        String path =  "/home/vassil/workspace/aim3/src/main/java/de/tuberlin/dima/aim3/assigntment4bonus/output/";
 
         DataSource<Tuple3<Integer, Integer, Integer>> matrix1 = readMatrix(env, m1PathCSV);
         DataSource<Tuple3<Integer, Integer, Integer>> matrix2 = readMatrix(env, m2PathCSV);
 
-        matrix1.join(matrix2).where(0).equalTo(1)
-                .map(new MatrixMultiplicationMap()).groupBy(0,1).sum(2)
+        matrix1.join(matrix2).where(1).equalTo(0)
+                .map(new MatrixMultiplicationMap())
+                .groupBy(0,1)
+                .sum(2)
                 .writeAsCsv(path, FileSystem.WriteMode.OVERWRITE);
 
         env.execute();
@@ -44,6 +46,7 @@ public class matrixCalc {
         public Tuple3<Integer, Integer, Integer> map(
                 Tuple2<Tuple3<Integer, Integer, Integer>, Tuple3<Integer, Integer, Integer>> value)
                 throws Exception {
+            System.out.println(value.f0 + " " + value.f1);
             Integer rowId = value.f0.f0;
             Integer columnId = value.f1.f1;
             Integer newValue = value.f0.f2 * value.f1.f2;
@@ -54,7 +57,7 @@ public class matrixCalc {
     public static DataSource<Tuple3<Integer, Integer, Integer>> readMatrix(ExecutionEnvironment env, String filePath) {
         CsvReader csvReader = env.readCsvFile(filePath);
         csvReader.fieldDelimiter(',');
-        csvReader.includeFields("fttt");
+        csvReader.includeFields("ttt");
         return csvReader.types(Integer.class, Integer.class, Integer.class);
     }
 
